@@ -51,6 +51,9 @@ cp .env.example .env
 # 데이터베이스 초기화
 npm run db:setup
 
+# 샘플 데이터 생성 (선택사항 - 테스트용)
+npm run db:seed
+
 # 개발 서버 실행
 npm run dev
 ```
@@ -217,6 +220,18 @@ cd backend
 rm -rf data/
 npm run db:setup
 ```
+
+### 샘플 데이터 다시 생성
+```bash
+cd backend
+npm run db:seed
+```
+
+**생성되는 샘플 데이터:**
+- 지원자 5명 (홍길동, 김영희, 이철수, 박민수, 최지은)
+- 면접 일정 5개 (진행 예정 3개, 완료 2개)
+- 직무별 질문 18개 (마케팅, 개발자, 디자이너, 데이터분석가)
+- 완료된 면접에 대한 평가 및 피드백
 
 ## 라이선스
 
