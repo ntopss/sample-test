@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>생활화학제품 신고증명서 발급 현황 대시보드</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <style>
+    /* ── 리셋 & 기본 ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #f0f4f8;
+      --surface:   #ffffff;
+      --primary:   #1a73e8;
+      --accent:    #e53935;
+      --text:      #1e293b;
+      --muted:     #64748b;
+      --border:    #e2e8f0;
+      --radius:    12px;
+      --shadow:    0 2px 12px rgba(0,0,0,.08);
+    }
+
+    body {
+      font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo',
+                   Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── 헤더 ── */
+    header {
+      background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%);
+      color: #fff;
+      padding: 28px 32px 24px;
+    }
+    header h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 4px; }
+    header p  { font-size: .875rem; opacity: .85; }
+
+    .meta-bar {
+      display: flex; flex-wrap: wrap; gap: 8px;
+      margin-top: 14px;
+    }
+    .meta-chip {
+      background: rgba(255,255,255,.2);
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: .78rem;
+    }
+
+    /* ── 레이아웃 ── */
+    main {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 28px 20px 48px;
+    }
+
+    /* KPI 카드 행 */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+    .kpi-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px 22px;
+    }
+    .kpi-card .label { font-size: .78rem; color: var(--muted); margin-bottom: 8px; }
+    .kpi-card .value { font-size: 1.9rem; font-weight: 700; color: var(--primary); }
+    .kpi-card .sub   { font-size: .75rem; color: var(--muted); margin-top: 4px; }
+
+    /* 차트 그리드 */
+    .chart-grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 20px;
+    }
+
+    /* 차트 카드 */
+    .card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 22px 22px 18px;
+      display: flex;
+      flex-direction: column;
+    }
+    .card-title {
+      font-size: .95rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+      color: var(--text);
+    }
+    .card-sub {
+      font-size: .78rem;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+    .chart-wrap {
+      flex: 1;
+      position: relative;
+      min-height: 260px;
+    }
+
+    /* 그리드 열 스팬 */
+    .col-4  { grid-column: span 4; }
+    .col-5  { grid-column: span 5; }
+    .col-7  { grid-column: span 7; }
+    .col-8  { grid-column: span 8; }
+    .col-12 { grid-column: span 12; }
+
+    /* Church & Dwight 테이블 */
+    .table-wrap {
+      overflow-x: auto;
+      max-height: 380px;
+      overflow-y: auto;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+    th {
+      background: #f1f5f9;
+      padding: 10px 12px;
+      text-align: left;
+      font-weight: 600;
+      border-bottom: 2px solid var(--border);
+      position: sticky; top: 0; z-index: 1;
+    }
+    td { padding: 9px 12px; border-bottom: 1px solid var(--border); }
+    tr:hover td { background: #f8fafc; }
+
+    /* 경고 / 로딩 배너 */
+    .alert {
+      background: #fff3e0;
+      border: 1px solid #ffb74d;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-bottom: 24px;
+      font-size: .875rem;
+      color: #7c4700;
+      display: none;
+    }
+    .alert.show { display: block; }
+
+    /* 티앤엘 배지 */
+    .tnl-badge {
+      background: var(--accent);
+      color: #fff;
+      font-size: .7rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 10px;
+      vertical-align: middle;
+      margin-left: 6px;
+    }
+
+    /* 푸터 */
+    footer {
+      text-align: center;
+      padding: 20px;
+      font-size: .78rem;
+      color: var(--muted);
+    }
+
+    /* 반응형 */
+    @media (max-width: 900px) {
+      .col-4, .col-5, .col-7, .col-8 { grid-column: span 12; }
+    }
+    @media (max-width: 600px) {
+      header h1 { font-size: 1.15rem; }
+      main { padding: 16px 12px 36px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>생활화학제품 신고증명서 발급 현황 대시보드</h1>
+  <p>한국환경산업기술원 화학제품관리시스템 · 공공데이터포털 오픈API</p>
+  <div class="meta-bar">
+    <span class="meta-chip" id="totalChip">전체 데이터 로딩 중...</span>
+    <span class="meta-chip" id="updatedChip">대시보드 기준일: —</span>
+    <span class="meta-chip">출처: api.odcloud.kr / 15105295</span>
+  </div>
+</header>
+
+<main>
+  <!-- 데이터 없을 때 경고 -->
+  <div class="alert" id="noDataAlert">
+    ⚠️ <strong>dashboard_data.json 파일을 찾을 수 없습니다.</strong><br/>
+    먼저 <code>python data_fetch.py [API_KEY]</code> 로 데이터를 수집한 뒤
+    <code>python analyze.py</code> 를 실행하면 <code>dashboard_data.json</code> 이 생성됩니다.<br/>
+    현재 화면은 <strong>샘플 데모 데이터</strong>로 표시됩니다.
+  </div>
+
+  <!-- KPI 카드 -->
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="label">전체 신고 건수</div>
+      <div class="value" id="kpiTotal">—</div>
+      <div class="sub">누적 신고증명서</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">ODM 신고 건수</div>
+      <div class="value" id="kpiOdm">—</div>
+      <div class="sub">ODM 방식 제품</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">수입 제품 건수</div>
+      <div class="value" id="kpiImport">—</div>
+      <div class="sub">해외 제조 수입 제품</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">ODM 업체 수 (TOP 20)</div>
+      <div class="value" id="kpiOdmCompanies">—</div>
+      <div class="sub">상위 업체</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Church &amp; Dwight 신고</div>
+      <div class="value" id="kpiCD">—</div>
+      <div class="sub">관련 키워드 포함</div>
+    </div>
+  </div>
+
+  <!-- 차트 그리드 -->
+  <div class="chart-grid">
+
+    <!-- 차트 1: 제조방식별 파이 -->
+    <div class="card col-4">
+      <div class="card-title">제조방식별 신고 비율</div>
+      <div class="card-sub">전체 신고 건수 기준 제조방식(MF_MTHD) 분포</div>
+      <div class="chart-wrap">
+        <canvas id="chartPie"></canvas>
+      </div>
+    </div>
+
+    <!-- 차트 2: ODM TOP 20 가로바 -->
+    <div class="card col-8">
+      <div class="card-title">ODM 업체 TOP 20 <span id="tnlBadge" style="display:none" class="tnl-badge">티앤엘 포함</span></div>
+      <div class="card-sub">ODM 방식 상호명(CN_NM) 기준 신고 건수 상위 20개 업체</div>
+      <div class="chart-wrap" style="min-height:420px">
+        <canvas id="chartOdm"></canvas>
+      </div>
+    </div>
+
+    <!-- 차트 3: 연도별 라인 -->
+    <div class="card col-7">
+      <div class="card-title">연도별 신규 신고 트렌드</div>
+      <div class="card-sub">신규구분(CL) = register 기준 · 발급일(ISSUDY) 연도 추출</div>
+      <div class="chart-wrap">
+        <canvas id="chartLine"></canvas>
+      </div>
+    </div>
+
+    <!-- 차트 4: 수입 국가 TOP 10 -->
+    <div class="card col-5">
+      <div class="card-title">수입 제품 제조국가 TOP 10</div>
+      <div class="card-sub">제조수입구분(MF_ICM) = suib 필터링 후 국가별 건수</div>
+      <div class="chart-wrap">
+        <canvas id="chartNation"></canvas>
+      </div>
+    </div>
+
+    <!-- 분석 5: Church & Dwight 테이블 -->
+    <div class="card col-12">
+      <div class="card-title">Church &amp; Dwight 관련 신고 현황</div>
+      <div class="card-sub">상호명(CN_NM)에 'church' / 'dwight' / 'arm' 포함된 레코드 전체</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>상호명</th>
+              <th>제품명</th>
+              <th>신고번호</th>
+              <th>발급일</th>
+              <th>제조방식</th>
+              <th>제조수입구분</th>
+              <th>제조국가</th>
+            </tr>
+          </thead>
+          <tbody id="cdTableBody">
+            <tr><td colspan="7" style="text-align:center;color:var(--muted)">데이터 로딩 중...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /chart-grid -->
+</main>
+
+<footer>
+  데이터 출처: 공공데이터포털(data.go.kr) · 한국환경산업기술원 화학제품관리시스템<br/>
+  본 대시보드는 <code>analyze.py</code> 생성 <code>dashboard_data.json</code> 을 읽어 렌더링합니다.
+</footer>
+
+<script>
+/* ════════════════════════════════════════════
+   팔레트 & 공통 설정
+   ════════════════════════════════════════════ */
+const PALETTE = [
+  '#1a73e8','#34a853','#fbbc04','#ea4335','#9c27b0',
+  '#00bcd4','#ff5722','#607d8b','#8bc34a','#ff9800',
+  '#3f51b5','#009688','#795548','#e91e63','#4caf50',
+  '#f44336','#2196f3','#ff4081','#673ab7','#cddc39',
+];
+const TNL_COLOR  = '#e53935';
+const BASE_COLOR = '#1a73e8';
+
+Chart.defaults.font.family =
+  "'Pretendard','Noto Sans KR','Apple SD Gothic Neo',Helvetica,Arial,sans-serif";
+Chart.defaults.color = '#64748b';
+
+/* ════════════════════════════════════════════
+   샘플 데모 데이터 (JSON 파일이 없을 때 사용)
+   ════════════════════════════════════════════ */
+const DEMO_DATA = {
+  manufacturing_method: {
+    "직접제조(direct)": 4200,
+    "OEM":             3100,
+    "ODM":             2850,
+    "수입(suib)":      1400,
+    "기타(etc)":        450,
+  },
+  odm_top20: [
+    { company:"코스맥스",        count: 420 },
+    { company:"한국콜마",        count: 390 },
+    { company:"티앤엘",          count: 320 },
+    { company:"코스메카코리아",  count: 280 },
+    { company:"아모레퍼시픽",   count: 240 },
+    { company:"씨제이올리브영", count: 210 },
+    { company:"LG생활건강",      count: 195 },
+    { company:"동성제약",        count: 178 },
+    { company:"애경산업",        count: 162 },
+    { company:"LS생활과학",      count: 151 },
+    { company:"제닉",            count: 144 },
+    { company:"에이블씨엔씨",   count: 138 },
+    { company:"엘앤피코스메틱", count: 127 },
+    { company:"씨앤텍",         count: 119 },
+    { company:"코리아나화장품", count: 112 },
+    { company:"현대코스메틱",   count: 105 },
+    { company:"파마리서치",      count:  98 },
+    { company:"클리오",          count:  92 },
+    { company:"스킨푸드",        count:  87 },
+    { company:"토니모리",        count:  83 },
+  ],
+  odm_tnl_included: true,
+  yearly_trend: {
+    "2017":  480, "2018":  720, "2019":  890,
+    "2020": 1050, "2021": 1280, "2022": 1430,
+    "2023": 1610, "2024": 1820,
+  },
+  import_countries: [
+    { nation:"중국",     count: 1280 },
+    { nation:"미국",     count:  420 },
+    { nation:"독일",     count:  210 },
+    { nation:"일본",     count:  190 },
+    { nation:"프랑스",   count:  160 },
+    { nation:"이탈리아", count:  130 },
+    { nation:"영국",     count:   98 },
+    { nation:"캐나다",   count:   74 },
+    { nation:"호주",     count:   61 },
+    { nation:"스위스",   count:   49 },
+  ],
+  church_dwight_count: 3,
+  church_dwight_records: [
+    { 상호명:"Church & Dwight Korea", 제품명:"Arm & Hammer 세탁세제", 신고번호:"CD-2022-001",
+      발급일:"20220315", 제조방식:"suib", 제조수입구분:"suib", 제조국가:"미국" },
+    { 상호명:"Church & Dwight Korea", 제품명:"OxiClean 다목적 세정제", 신고번호:"CD-2022-002",
+      발급일:"20220315", 제조방식:"suib", 제조수입구분:"suib", 제조국가:"미국" },
+    { 상호명:"Dwight Trading", 제품명:"ARM 표백제", 신고번호:"DW-2023-047",
+      발급일:"20230801", 제조방식:"suib", 제조수입구분:"suib", 제조국가:"미국" },
+  ],
+};
+
+/* ════════════════════════════════════════════
+   데이터 로드
+   ════════════════════════════════════════════ */
+async function loadData() {
+  try {
+    const res = await fetch('dashboard_data.json');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (e) {
+    console.warn('dashboard_data.json 로드 실패, 데모 데이터 사용:', e.message);
+    document.getElementById('noDataAlert').classList.add('show');
+    return DEMO_DATA;
+  }
+}
+
+/* ════════════════════════════════════════════
+   KPI 업데이트
+   ════════════════════════════════════════════ */
+function updateKPI(data) {
+  const mmVals = Object.values(data.manufacturing_method);
+  const total  = mmVals.reduce((a,b) => a+b, 0);
+  const odm    = data.odm_top20.reduce((s,r) => s+r.count, 0);
+  const imp    = data.import_countries.reduce((s,r) => s+r.count, 0);
+
+  const fmt = n => n.toLocaleString('ko-KR');
+  document.getElementById('kpiTotal').textContent        = fmt(total);
+  document.getElementById('kpiOdm').textContent          = fmt(odm);
+  document.getElementById('kpiImport').textContent       = fmt(imp);
+  document.getElementById('kpiOdmCompanies').textContent = data.odm_top20.length;
+  document.getElementById('kpiCD').textContent           = data.church_dwight_count;
+  document.getElementById('totalChip').textContent       = `전체 ${fmt(total)}건`;
+  document.getElementById('updatedChip').textContent     =
+    `대시보드 기준일: ${new Date().toLocaleDateString('ko-KR')}`;
+}
+
+/* ════════════════════════════════════════════
+   차트 1: 제조방식 파이
+   ════════════════════════════════════════════ */
+function renderPie(data) {
+  const labels = Object.keys(data.manufacturing_method);
+  const values = Object.values(data.manufacturing_method);
+  new Chart(document.getElementById('chartPie'), {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: PALETTE,
+        borderWidth: 2,
+        borderColor: '#fff',
+        hoverOffset: 8,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { padding: 14, font: { size: 12 } } },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const total = ctx.dataset.data.reduce((a,b)=>a+b,0);
+              const pct   = (ctx.parsed / total * 100).toFixed(1);
+              return ` ${ctx.label}: ${ctx.parsed.toLocaleString('ko-KR')}건 (${pct}%)`;
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+/* ════════════════════════════════════════════
+   차트 2: ODM TOP 20 수평 바
+   ════════════════════════════════════════════ */
+function renderOdm(data) {
+  const tnlKws = ['티앤엘', 't&l', 'ttnl'];
+  const isTnl  = name => tnlKws.some(k => name.toLowerCase().includes(k));
+
+  const sorted   = [...data.odm_top20].sort((a,b) => a.count - b.count);
+  const labels   = sorted.map(r => r.company);
+  const values   = sorted.map(r => r.count);
+  const colors   = sorted.map(r => isTnl(r.company) ? TNL_COLOR : BASE_COLOR);
+  const alphas   = sorted.map(r => isTnl(r.company) ? 1.0 : 0.75);
+
+  if (data.odm_tnl_included) {
+    document.getElementById('tnlBadge').style.display = '';
+  }
+
+  new Chart(document.getElementById('chartOdm'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: '신고 건수',
+        data: values,
+        backgroundColor: colors.map((c,i) => c + Math.round(alphas[i]*255).toString(16).padStart(2,'0')),
+        borderRadius: 4,
+        borderSkipped: false,
+      }],
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx =>
+              ` ${ctx.parsed.x.toLocaleString('ko-KR')}건` +
+              (isTnl(ctx.label) ? ' ← 티앤엘(T&L)' : ''),
+          },
+        },
+      },
+      scales: {
+        x: {
+          beginAtZero: true,
+          grid: { color: '#f1f5f9' },
+          ticks: { callback: v => v.toLocaleString('ko-KR') },
+        },
+        y: {
+          grid: { display: false },
+          ticks: {
+            font: { size: 11 },
+            callback: function(val, idx) {
+              const lbl = this.getLabelForValue(val);
+              return isTnl(lbl) ? '★ ' + lbl : lbl;
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+/* ════════════════════════════════════════════
+   차트 3: 연도별 라인
+   ════════════════════════════════════════════ */
+function renderLine(data) {
+  const years  = Object.keys(data.yearly_trend);
+  const counts = Object.values(data.yearly_trend);
+
+  new Chart(document.getElementById('chartLine'), {
+    type: 'line',
+    data: {
+      labels: years,
+      datasets: [{
+        label: '신규 신고 건수',
+        data: counts,
+        borderColor: BASE_COLOR,
+        backgroundColor: BASE_COLOR + '22',
+        fill: true,
+        tension: 0.35,
+        pointRadius: 5,
+        pointHoverRadius: 7,
+        borderWidth: 2.5,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.parsed.y.toLocaleString('ko-KR')}건`,
+          },
+        },
+      },
+      scales: {
+        x: { grid: { color: '#f1f5f9' } },
+        y: {
+          beginAtZero: false,
+          grid: { color: '#f1f5f9' },
+          ticks: { callback: v => v.toLocaleString('ko-KR') },
+        },
+      },
+    },
+  });
+}
+
+/* ════════════════════════════════════════════
+   차트 4: 수입 국가 TOP 10 수직 바
+   ════════════════════════════════════════════ */
+function renderNation(data) {
+  const labels = data.import_countries.map(r => r.nation);
+  const values = data.import_countries.map(r => r.count);
+
+  new Chart(document.getElementById('chartNation'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: '수입 건수',
+        data: values,
+        backgroundColor: PALETTE.slice(0, labels.length).map(c => c + 'cc'),
+        borderRadius: 5,
+        borderSkipped: false,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.parsed.y.toLocaleString('ko-KR')}건`,
+          },
+        },
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+        y: {
+          beginAtZero: true,
+          grid: { color: '#f1f5f9' },
+          ticks: { callback: v => v.toLocaleString('ko-KR') },
+        },
+      },
+    },
+  });
+}
+
+/* ════════════════════════════════════════════
+   테이블: Church & Dwight
+   ════════════════════════════════════════════ */
+function renderCDTable(data) {
+  const tbody = document.getElementById('cdTableBody');
+  const records = data.church_dwight_records;
+
+  if (!records || records.length === 0) {
+    tbody.innerHTML =
+      '<tr><td colspan="7" style="text-align:center;color:var(--muted)">관련 레코드 없음</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = records.map(r => `
+    <tr>
+      <td>${escHtml(r['상호명'])}</td>
+      <td>${escHtml(r['제품명'])}</td>
+      <td><code>${escHtml(r['신고번호'])}</code></td>
+      <td>${escHtml(r['발급일'])}</td>
+      <td>${escHtml(r['제조방식'])}</td>
+      <td>${escHtml(r['제조수입구분'])}</td>
+      <td>${escHtml(r['제조국가'])}</td>
+    </tr>
+  `).join('');
+}
+
+function escHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ════════════════════════════════════════════
+   진입점
+   ════════════════════════════════════════════ */
+(async () => {
+  const data = await loadData();
+  updateKPI(data);
+  renderPie(data);
+  renderOdm(data);
+  renderLine(data);
+  renderNation(data);
+  renderCDTable(data);
+})();
+</script>
+
+</body>
+</html>
